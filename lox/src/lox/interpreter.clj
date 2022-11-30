@@ -41,10 +41,11 @@
                      :while visit-while-stmt}
                     self))
           (execute-block [self stmts environment]
-            (let [self (assoc self :environment environment)]
+            (let [previous (:environment self)
+                  self (assoc self :environment environment)]
               (letfn [(loop [self stmts]
                         (if (empty? stmts)
-                          (list self nil)
+                          (list (assoc self :environment previous) nil)
                           (let [[self _] (execute self (first stmts))]
                             (recur self (rest stmts)))))]
                 (loop self stmts))))
