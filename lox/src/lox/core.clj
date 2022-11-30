@@ -1,7 +1,18 @@
 (ns lox.core
-  (:gen-class))
+  (:gen-class)
+  (:require [lox.scanner :refer [->Scanner scan-tokens]]))
 
-(defn run [source])
+(def new-state
+  {:had-error false})
+
+(defmacro member [name]
+  `(fn [x#] (~name x#)))
+
+(defn run [source state]
+  (let [scanner (->Scanner source)
+        [tokens state] (scan-tokens scanner state)]
+    (dorun (map (comp println (member .toString)) tokens))
+    state))
 
 (defn run-prompt []
   (print "lox> ")
@@ -10,11 +21,14 @@
     (if (= source nil)
       (println ".q")
       (do
-        (run source)
+        (run source new-state)
         (recur)))))
 
 (defn run-file [file]
-  (-> file slurp run))
+  (let [source (slurp file)
+        state (run source new-state)]
+    (when (:had-error state)
+      (System/exit 65))))
 
 (defn -main
   "I don't do a whole lot ... yet."
@@ -22,4 +36,6 @@
   (case (count args)
     0 (run-prompt)
     1 (run-file (first args))
-    (println "Usage: lox [script]")))
+    (do
+      (println "Usage: lox [script]")
+      (System/exit 64))))
