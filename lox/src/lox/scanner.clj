@@ -1,6 +1,7 @@
 (ns lox.scanner
   (:refer-clojure :exclude [peek])
   (:require [lox.errors :refer [error]]
+            [lox.helpers :refer [member]]
             [lox.token :refer [->Token]]))
 
 (defn ->Scanner [source]
@@ -13,10 +14,15 @@
 (defn- is-at-end [scanner]
   (>= (:current scanner) (count (:source scanner))))
 
-(defn- peek [scanner]
-  (if (is-at-end scanner)
-    \u0000
-    (nth (:source scanner) (:current scanner))))
+(defn- peek
+  ([scanner] (peek scanner 0))
+  ([scanner n]
+   (let [i (+ (:current scanner) n)]
+     (if (>= i (count (:source scanner)))
+       \u0000
+       (nth (:source scanner) i)))))
+
+(defn- peek-next [scanner] (peek scanner 1))
 
 (defn- advance [scanner]
   (let [c (peek scanner)]
@@ -31,10 +37,13 @@
     (list (first (advance scanner)) true)
     (list scanner false)))
 
+(defn- token-text [scanner]
+  (subs (:source scanner) (:start scanner) (:current scanner)))
+
 (defn- add-token
   ([scanner type] (add-token scanner type nil))
   ([scanner type literal]
-   (let [text (subs (:source scanner) (:start scanner) (:current scanner))
+   (let [text (token-text scanner)
          token (->Token type text literal (:line scanner))]
      (assoc scanner
             :tokens (conj (:tokens scanner) token)))))
@@ -58,6 +67,22 @@
                           (dec (:current scanner)))
               scanner (add-token scanner :string value)]
           (list scanner state))))))
+
+(defn- number [scanner state]
+  (letfn [(skip [scanner]
+            (if (-> scanner peek ((member Character/isDigit)))
+              (-> scanner advance first recur)
+              scanner))]
+    (let [scanner (skip scanner)
+          ; Look for a fractional part.
+          scanner (if (and
+                       (-> scanner peek (= \.))
+                       (-> scanner peek-next ((member Character/isDigit))))
+                    (-> scanner advance first skip)
+                    scanner)]
+      (list
+       (add-token scanner :number (Double/parseDouble (token-text scanner)))
+       state))))
 
 (defn- check-token [c scanner state]
   (letfn [(ok [scanner]
@@ -96,7 +121,9 @@
       (\  \return \tab) (ok scanner)
       \newline (ok (assoc scanner :line (inc (:line scanner))))
       \" (string scanner state)
-      (err "Unexpected character." scanner state))))
+      (if (Character/isDigit c)
+        (number scanner state)
+        (err "Unexpected character." scanner state)))))
 
 (defn- scan-token [scanner state]
   (let [[scanner c] (advance scanner)

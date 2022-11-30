@@ -1,12 +1,10 @@
 (ns lox.core
   (:gen-class)
-  (:require [lox.scanner :refer [->Scanner scan-tokens]]))
+  (:require [lox.helpers :refer [member]]
+            [lox.scanner :refer [->Scanner scan-tokens]]))
 
 (def new-state
   {:had-error false})
-
-(defmacro member [name]
-  `(fn [x#] (~name x#)))
 
 (defn run [source state]
   (let [scanner (->Scanner source)
