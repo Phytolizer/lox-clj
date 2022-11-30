@@ -68,7 +68,7 @@
               scanner (add-token scanner :string value)]
           (list scanner state))))))
 
-(defn- number [scanner state]
+(defn- number [scanner]
   (letfn [(skip [scanner]
             (if (-> scanner peek ((member Character/isDigit)))
               (-> scanner advance first recur)
@@ -80,9 +80,42 @@
                        (-> scanner peek-next ((member Character/isDigit))))
                     (-> scanner advance first skip)
                     scanner)]
-      (list
-       (add-token scanner :number (Double/parseDouble (token-text scanner)))
-       state))))
+      (add-token scanner :number (Double/parseDouble (token-text scanner))))))
+
+(defn- is-alpha [c]
+  (or (Character/isLetter c)
+      (= c \_)))
+
+(defn- is-alnum [c]
+  (or (is-alpha c)
+      (Character/isDigit c)))
+
+(def ^:private keywords
+  {"and" :and
+   "class" :class
+   "else" :else
+   "false" :false
+   "for" :for
+   "fun" :fun
+   "if" :if
+   "nil" :nil
+   "or" :or
+   "print" :print
+   "return" :return
+   "super" :super
+   "this" :this
+   "true" :true
+   "var" :var
+   "while" :while})
+
+(defn- identifier [scanner]
+  (letfn [(skip [scanner]
+            (if (-> scanner peek is-alnum)
+              (-> scanner advance first recur)
+              scanner))]
+    (let [scanner (skip scanner)]
+      (add-token scanner
+                 (get keywords (token-text scanner) :identifier)))))
 
 (defn- check-token [c scanner state]
   (letfn [(ok [scanner]
@@ -115,15 +148,16 @@
                             (= (peek scanner) \newline)
                             (is-at-end scanner))
                          scanner
-                         (recur (first (advance scanner)))))]
+                         (-> scanner advance first recur)))]
                (ok (next scanner)))
              (ok (add-token scanner :slash))))
       (\  \return \tab) (ok scanner)
       \newline (ok (assoc scanner :line (inc (:line scanner))))
       \" (string scanner state)
-      (if (Character/isDigit c)
-        (number scanner state)
-        (err "Unexpected character." scanner state)))))
+      (cond
+        (Character/isDigit c) (-> scanner number ok)
+        (is-alpha c) (-> scanner identifier ok)
+        :else (err "Unexpected character." scanner state)))))
 
 (defn- scan-token [scanner state]
   (let [[scanner c] (advance scanner)
