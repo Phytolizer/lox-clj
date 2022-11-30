@@ -39,6 +39,26 @@
      (assoc scanner
             :tokens (conj (:tokens scanner) token)))))
 
+(defn- string [scanner state]
+  (letfn [(skip [scanner]
+            (if (or (= (peek scanner) \") (is-at-end scanner))
+              scanner
+              (let [scanner (if (= (peek scanner) \newline)
+                              (assoc scanner :line (inc (:line scanner)))
+                              scanner)
+                    scanner (first (advance scanner))]
+                (recur scanner))))]
+    (let [scanner (skip scanner)]
+      (if (is-at-end scanner)
+        (list scanner
+              (error (:line scanner) "Unterminated string." state))
+        (let [scanner (first (advance scanner))
+              value (subs (:source scanner)
+                          (inc (:start scanner))
+                          (dec (:current scanner)))
+              scanner (add-token scanner :string value)]
+          (list scanner state))))))
+
 (defn- check-token [c scanner state]
   (letfn [(ok [scanner]
             (list scanner state))
@@ -75,6 +95,7 @@
              (ok (add-token scanner :slash))))
       (\  \return \tab) (ok scanner)
       \newline (ok (assoc scanner :line (inc (:line scanner))))
+      \" (string scanner state)
       (err "Unexpected character." scanner state))))
 
 (defn- scan-token [scanner state]
