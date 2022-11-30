@@ -1,8 +1,8 @@
 (ns lox.parser
   (:refer-clojure :exclude (peek))
   (:require [lox.errors]
-            [lox.expr :refer [->BinaryExpr ->GroupingExpr ->LiteralExpr
-                              ->UnaryExpr ->VariableExpr]]
+            [lox.expr :refer [->AssignExpr ->BinaryExpr ->GroupingExpr
+                              ->LiteralExpr ->UnaryExpr ->VariableExpr]]
             [lox.helpers :refer [try-any]]
             [lox.stmt :refer [->ExpressionStmt ->PrintStmt ->VarStmt]]))
 
@@ -42,9 +42,11 @@
         (recur f types [parser state expr]))
       (list parser state expr))))
 
-(defn- error [parser state message]
-  (let [state (lox.errors/error-token (peek parser) message state)]
-    (ex-info "parser error" {:state state})))
+(defn- error
+  ([parser state message] (error parser state (peek parser) message))
+  ([_ state token message]
+   (let [state (lox.errors/error-token token message state)]
+     (ex-info "parser error" {:state state}))))
 
 (defn- consume [parser state type message]
   (if (check parser type)
@@ -65,7 +67,7 @@
                        :print
                        :return}
                      (.type (peek parser))))
-              nil
+              parser
               (recur (advance parser))))]
     (loop (advance parser))))
 
@@ -114,8 +116,18 @@
             (binary-parser-loop comparison
                                 '(:bang-equal :equal-equal)
                                 (comparison parser state)))
+          (assignment [parser state]
+            (let [[parser state expr] (equality parser state)
+                  [parser matched] (match parser '(:equal))]
+              (if matched
+                (let [equals (previous parser)
+                      [parser state value] (assignment parser state)]
+                  (if (= (:type expr) :variable)
+                    (list parser state (->AssignExpr (:name (:value expr)) value))
+                    (throw (error parser state equals "Invalid assignment target."))))
+                (list parser state expr))))
           (expression [parser state]
-            (equality parser state))
+            (assignment parser state))
           (print-statement [parser state]
             (let [[parser state value] (expression parser state)
                   parser (consume parser state :semicolon "Expect ';' after value.")]
@@ -141,11 +153,12 @@
               (try-match parser state
                          ['(:var) #(var-declaration %1 %2)]
                          ['() #(statement %1 %2)])
-              (catch clojure.lang.ExceptionInfo _
-                (list (synchronize parser) state nil))))]
+              (catch clojure.lang.ExceptionInfo e
+                (list (synchronize parser) (:state (ex-data e)) nil))))]
     (letfn [(stmt-loop [parser state statements]
               (if (is-at-end parser)
                 (list parser state statements)
                 (let [[parser state s] (declaration parser state)]
                   (recur parser state (conj statements s)))))]
-      (stmt-loop parser state []))))
+      (let [[_ state stmts] (stmt-loop parser state [])]
+        (list state stmts)))))

@@ -12,7 +12,7 @@
 (defn run [source interpreter state]
   (let [scanner (->Scanner source)
         [tokens state] (scan-tokens scanner state)
-        [_ state stmts] (parse (->Parser tokens) state)]
+        [state stmts] (parse (->Parser tokens) state)]
     (if (:had-error state)
       (list interpreter state)
       (interpret stmts state interpreter))))

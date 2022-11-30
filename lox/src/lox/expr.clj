@@ -1,5 +1,10 @@
 (ns lox.expr)
 
+(defn ->AssignExpr [name value]
+  {:type :assign
+   :value {:name name
+           :value value}})
+
 (defn ->BinaryExpr [left operator right]
   {:type :binary
    :value {:left left

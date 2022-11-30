@@ -23,7 +23,8 @@
 (def ^:private execute
   (letfn [(evaluate [self expr]
             (accept expr
-                    {:binary visit-binary-expr
+                    {:assign visit-assign-expr
+                     :binary visit-binary-expr
                      :grouping visit-grouping-expr
                      :literal visit-literal-expr
                      :unary visit-unary-expr
@@ -45,8 +46,16 @@
             (let [[self value] (if (:initializer stmt)
                                  (evaluate self (:initializer stmt))
                                  (list self nil))
-                  environment (lox.environment/define (:environment self) (.lexeme (:name stmt)) value)]
+                  environment (lox.environment/define (:environment self)
+                                (.lexeme (:name stmt))
+                                value)]
               (list (assoc self :environment environment) nil)))
+          (visit-assign-expr [self expr]
+            (let [[self value] (evaluate self (:value expr))
+                  environment  (lox.environment/assign (:environment self)
+                                                       (:name expr)
+                                                       value)]
+              (list (assoc self :environment environment) value)))
           (visit-literal-expr [self expr]
             (list self (:value expr)))
           (visit-grouping-expr [self expr]
