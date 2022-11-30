@@ -1,12 +1,20 @@
 (ns lox.core
   (:gen-class))
 
+(defn run [source])
+
 (defn run-prompt []
-  (println "lox> "))
+  (print "lox> ")
+  (flush)
+  (let [source (read-line)]
+    (if (= source nil)
+      (println ".q")
+      (do
+        (run source)
+        (recur)))))
 
 (defn run-file [file]
-  (let [source (slurp file)]
-    (println source)))
+  (-> file slurp run))
 
 (defn -main
   "I don't do a whole lot ... yet."
