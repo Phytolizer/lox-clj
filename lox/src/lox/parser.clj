@@ -2,7 +2,7 @@
   (:refer-clojure :exclude (peek))
   (:require [lox.errors]
             [lox.expr :refer [->AssignExpr ->BinaryExpr ->GroupingExpr
-                              ->LiteralExpr ->UnaryExpr ->VariableExpr]]
+                              ->LiteralExpr ->LogicalExpr ->UnaryExpr ->VariableExpr]]
             [lox.helpers :refer [try-any]]
             [lox.stmt :refer [->BlockStmt ->ExpressionStmt ->IfStmt
                               ->PrintStmt ->VarStmt]]))
@@ -34,13 +34,13 @@
     (list (advance parser) true)
     (list parser false)))
 
-(defn- binary-parser-loop [f types [parser state expr]]
+(defn- binary-parser-loop [f types [parser state expr] result-fn]
   (let [[parser matched] (match parser types)]
     (if matched
       (let [operator (previous parser)
             [parser state right] (f parser state)
-            expr (->BinaryExpr expr operator right)]
-        (recur f types [parser state expr]))
+            expr (result-fn expr operator right)]
+        (recur f types [parser state expr] result-fn))
       (list parser state expr))))
 
 (defn- error
@@ -104,21 +104,35 @@
           (factor [parser state]
             (binary-parser-loop unary
                                 '(:slash :star)
-                                (unary parser state)))
+                                (unary parser state)
+                                ->BinaryExpr))
           (term [parser state]
             (binary-parser-loop factor
                                 '(:minus :plus)
-                                (factor parser state)))
+                                (factor parser state)
+                                ->BinaryExpr))
           (comparison [parser state]
             (binary-parser-loop term
                                 '(:greater :greater-equal :less :less-equal)
-                                (term parser state)))
+                                (term parser state)
+                                ->BinaryExpr))
           (equality [parser state]
             (binary-parser-loop comparison
                                 '(:bang-equal :equal-equal)
-                                (comparison parser state)))
+                                (comparison parser state)
+                                ->BinaryExpr))
+          (and-expr [parser state]
+            (binary-parser-loop equality
+                                '(:and)
+                                (equality parser state)
+                                ->LogicalExpr))
+          (or-expr [parser state]
+            (binary-parser-loop and-expr
+                                '(:or)
+                                (and-expr parser state)
+                                ->LogicalExpr))
           (assignment [parser state]
-            (let [[parser state expr] (equality parser state)
+            (let [[parser state expr] (or-expr parser state)
                   [parser matched] (match parser '(:equal))]
               (if matched
                 (let [equals (previous parser)

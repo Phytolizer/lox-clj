@@ -19,6 +19,12 @@
   {:type :literal
    :value {:value value}})
 
+(defn ->LogicalExpr [left operator right]
+  {:type :logical
+   :value {:left left
+           :operator operator
+           :right right}})
+
 (defn ->UnaryExpr [operator right]
   {:type :unary
    :value {:operator operator

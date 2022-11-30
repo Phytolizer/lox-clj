@@ -27,6 +27,7 @@
                      :binary visit-binary-expr
                      :grouping visit-grouping-expr
                      :literal visit-literal-expr
+                     :logical visit-logical-expr
                      :unary visit-unary-expr
                      :variable visit-variable-expr}
                     self))
@@ -104,7 +105,13 @@
                                   (and (number? left) (number? right)) (+ left right)
                                   (and (string? left) (string? right)) (str left right)
                                   :else (throw (runtime-error (:operator expr) "Operands must be two numbers or two strings."))))]
-              (list self value)))]
+              (list self value)))
+          (visit-logical-expr [self expr]
+            (let [[self left] (evaluate self (:left expr))]
+              (if (or (and (= (.type (:operator expr)) :or) (truthy? left))
+                      (and (= (.type (:operator expr)) :and) (not (truthy? left))))
+                (list self left)
+                (evaluate self (:right expr)))))]
     execute))
 
 (defn- stringify [value]
