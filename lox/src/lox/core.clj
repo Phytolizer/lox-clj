@@ -12,10 +12,10 @@
 (defn run [source interpreter state]
   (let [scanner (->Scanner source)
         [tokens state] (scan-tokens scanner state)
-        [_ state expr] (parse (->Parser tokens) state)]
+        [_ state stmts] (parse (->Parser tokens) state)]
     (if (:had-error state)
       (list interpreter state)
-      (interpret expr state interpreter))))
+      (interpret stmts state interpreter))))
 
 (defn run-prompt [interpreter]
   (print "lox> ")

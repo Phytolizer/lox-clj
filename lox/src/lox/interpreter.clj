@@ -19,7 +19,7 @@
     [left right]
     (throw (runtime-error operator "Operands must be numbers."))))
 
-(def ^:private evaluate
+(def ^:private execute
   (letfn [(evaluate [self expr]
             (accept expr
                     {:binary visit-binary-expr
@@ -27,6 +27,17 @@
                      :literal visit-literal-expr
                      :unary visit-unary-expr}
                     self))
+          (execute [self stmt]
+            (accept stmt
+                    {:expression visit-expression-stmt
+                     :print visit-print-stmt}
+                    self))
+          (visit-expression-stmt [self stmt]
+            (evaluate self (:expression stmt)))
+          (visit-print-stmt [self stmt]
+            (let [[self value] (evaluate self (:expression stmt))]
+              (println value)
+              (list self nil)))
           (visit-literal-expr [self expr]
             (list self (:value expr)))
           (visit-grouping-expr [self expr]
@@ -55,7 +66,7 @@
                                   (and (string? left) (string? right)) (str left right)
                                   :else (throw (runtime-error (:operator expr) "Operands must be two numbers or two strings."))))]
               (list self value)))]
-    evaluate))
+    execute))
 
 (defn- stringify [value]
   (cond
@@ -66,11 +77,14 @@
                         text))
     :else (.toString value)))
 
-(defn ^:dynamic interpret [expr state interpreter]
+(defn interpret [stmts state interpreter]
   (try
-    (let [[interpreter value] (evaluate interpreter expr)]
-      (-> value stringify println)
-      (list interpreter state))
+    (letfn [(run [self stmts]
+              (if (empty? stmts)
+                self
+                (let [[self _] (execute self (first stmts))]
+                  (recur self (rest stmts)))))]
+      (run interpreter stmts))
     (catch clojure.lang.ExceptionInfo e
       (list interpreter (lox.errors/runtime-error e state)))))
 

@@ -3,7 +3,8 @@
   (:require [lox.errors]
             [lox.expr :refer [->BinaryExpr ->GroupingExpr ->LiteralExpr
                               ->UnaryExpr]]
-            [lox.helpers :refer [try-any]]))
+            [lox.helpers :refer [try-any]]
+            [lox.stmt :refer [->ExpressionStmt ->PrintStmt]]))
 
 (defn ->Parser [tokens]
   {:tokens tokens
@@ -69,13 +70,13 @@
     (loop (advance parser))))
 
 (defn- try-match [parser state & pairs]
-  (if (empty? pairs)
-    (throw (error parser state "Expect expression."))
-    (let [[types result-if-match] (first pairs)
-          [parser matched] (match parser types)]
-      (if matched
-        (result-if-match parser state)
-        (recur parser state (rest pairs))))))
+  (let [[types result-if-match] (first pairs)]
+    (if (empty? types)
+      (result-if-match parser state)
+      (let [[parser matched] (match parser types)]
+        (if matched
+          (result-if-match parser state)
+          (recur parser state (rest pairs)))))))
 
 (defn parse [parser state]
   (letfn [(primary [parser state]
@@ -87,15 +88,15 @@
                        ['(:left-paren) (fn [parser state]
                                          (let [[parser state expr] (expression parser state)]
                                            (consume parser state :right-paren "Expect ')' after expression.")
-                                           (list parser state (->GroupingExpr expr))))]))
+                                           (list parser state (->GroupingExpr expr))))]
+                       ['() #(throw (error %1 %2 "Expect expression."))]))
           (unary [parser state]
-            (let [[parser matched] (match parser '(:bang :minus))]
-              (if matched
-                (let [operator (previous parser)
-                      [parser state right] (unary parser state)
-                      expr (->UnaryExpr operator right)]
-                  (list parser state expr))
-                (primary parser state))))
+            (try-match parser state
+                       ['(:bang :minus) (fn [parser state]
+                                          (let [operator (previous parser)
+                                                [parser state right] (unary parser state)]
+                                            (list parser state (->UnaryExpr operator right))))]
+                       ['() #(primary %1 %2)]))
           (factor [parser state]
             (binary-parser-loop unary
                                 '(:slash :star)
@@ -113,9 +114,22 @@
                                 '(:bang-equal :equal-equal)
                                 (comparison parser state)))
           (expression [parser state]
-            (equality parser state))]
-    (try
-      (expression parser state)
-      (catch clojure.lang.ExceptionInfo e
-        (let [{:keys [state]} (ex-data e)]
-          (list parser state nil))))))
+            (equality parser state))
+          (print-statement [parser state]
+            (let [[parser state value] (expression parser state)
+                  parser (consume parser state :semicolon "Expect ';' after value.")]
+              (list parser state (->PrintStmt value))))
+          (expression-statement [parser state]
+            (let [[parser state expr] (expression parser state)
+                  parser (consume parser state :semicolon "Expect ';' after expression.")]
+              (list parser state (->ExpressionStmt expr))))
+          (statement [parser state]
+            (try-match parser state
+                       ['(:print) #(print-statement %1 %2)]
+                       ['() #(expression-statement %1 %2)]))]
+    (letfn [(stmt-loop [parser state statements]
+              (if (is-at-end parser)
+                (list parser state statements)
+                (let [[parser state s] (statement parser state)]
+                  (recur parser state (conj statements s)))))]
+      (stmt-loop parser state []))))
