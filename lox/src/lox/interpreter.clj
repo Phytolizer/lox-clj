@@ -20,6 +20,15 @@
     [left right]
     (throw (runtime-error operator "Operands must be numbers."))))
 
+(defn- stringify [value]
+  (cond
+    (nil? value) "nil"
+    (number? value) (let [text (str value)]
+                      (if (.endsWith text ".0")
+                        (subs text 0 (- (count text) 2))
+                        text))
+    :else (.toString value)))
+
 (def ^:private execute
   (letfn [(evaluate [self expr]
             (accept expr
@@ -60,7 +69,7 @@
                 :else (list self nil))))
           (visit-print-stmt [self stmt]
             (let [[self value] (evaluate self (:expression stmt))]
-              (println value)
+              (println (stringify value))
               (list self nil)))
           (visit-var-stmt [self stmt]
             (let [[self value] (if (:initializer stmt)
@@ -122,15 +131,6 @@
                 (list self left)
                 (evaluate self (:right expr)))))]
     execute))
-
-(defn- stringify [value]
-  (cond
-    (nil? value) "nil"
-    (number? value) (let [text (str value)]
-                      (if (.endsWith text ".0")
-                        (subs text 0 (- (count text) 2))
-                        text))
-    :else (.toString value)))
 
 (defn interpret [stmts state interpreter]
   (try
