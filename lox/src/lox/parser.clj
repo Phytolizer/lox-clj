@@ -4,8 +4,8 @@
             [lox.expr :refer [->AssignExpr ->BinaryExpr ->GroupingExpr
                               ->LiteralExpr ->UnaryExpr ->VariableExpr]]
             [lox.helpers :refer [try-any]]
-            [lox.stmt :refer [->BlockStmt ->ExpressionStmt ->PrintStmt
-                              ->VarStmt]]))
+            [lox.stmt :refer [->BlockStmt ->ExpressionStmt ->IfStmt
+                              ->PrintStmt ->VarStmt]]))
 
 (defn ->Parser [tokens]
   {:tokens tokens
@@ -146,8 +146,19 @@
               (let [[parser state stmts] (stmt-loop parser state [])
                     parser (consume parser state :right-brace "Expect '}' after block.")]
                 (list parser state (->BlockStmt stmts)))))
+          (if-statement [parser state]
+            (let [parser (consume parser state :left-paren "Expect '(' after 'if'.")
+                  [parser state condition] (expression parser state)
+                  parser (consume parser state :right-paren "Expect ')' after if condition.")
+                  [parser state then-branch] (statement parser state)
+                  [parser state else-branch] (let [[parser matched] (match parser '(:else))]
+                                               (if matched
+                                                 (statement parser state)
+                                                 (list parser state nil)))]
+              (list parser state (->IfStmt condition then-branch else-branch))))
           (statement [parser state]
             (try-match parser state
+                       ['(:if) #(if-statement %1 %2)]
                        ['(:print) #(print-statement %1 %2)]
                        ['(:left-brace) #(block-statement %1 %2)]
                        ['() #(expression-statement %1 %2)]))

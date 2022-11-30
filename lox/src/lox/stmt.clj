@@ -8,6 +8,12 @@
   {:type :expression
    :value {:expression expression}})
 
+(defn ->IfStmt [condition then-branch else-branch]
+  {:type :if
+   :value {:condition condition
+           :then-branch then-branch
+           :else-branch else-branch}})
+
 (defn ->PrintStmt [expression]
   {:type :print
    :value {:expression expression}})

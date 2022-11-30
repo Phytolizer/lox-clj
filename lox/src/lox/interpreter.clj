@@ -34,6 +34,7 @@
             (accept stmt
                     {:block visit-block-stmt
                      :expression visit-expression-stmt
+                     :if visit-if-stmt
                      :print visit-print-stmt
                      :var visit-var-stmt}
                     self))
@@ -49,6 +50,12 @@
             (execute-block self (:statements stmt) (->Environment (:environment self))))
           (visit-expression-stmt [self stmt]
             (evaluate self (:expression stmt)))
+          (visit-if-stmt [self stmt]
+            (let [[self condition] (evaluate self (:condition stmt))]
+              (cond
+                (truthy? condition) (execute self (:then-branch stmt))
+                (not (nil? (:else-branch stmt))) (execute self (:else-branch stmt))
+                :else (list self nil))))
           (visit-print-stmt [self stmt]
             (let [[self value] (evaluate self (:expression stmt))]
               (println value)
