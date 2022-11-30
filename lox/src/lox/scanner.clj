@@ -113,9 +113,9 @@
             (if (-> scanner peek is-alnum)
               (-> scanner advance first recur)
               scanner))]
-    (let [scanner (skip scanner)]
-      (add-token scanner
-                 (get keywords (token-text scanner) :identifier)))))
+    (let [scanner (skip scanner)
+          type (get keywords (token-text scanner) :identifier)]
+      (add-token scanner type))))
 
 (defn- check-token [c scanner state]
   (letfn [(ok [scanner]
