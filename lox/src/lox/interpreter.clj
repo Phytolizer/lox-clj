@@ -32,10 +32,24 @@
                     self))
           (execute [self stmt]
             (accept stmt
-                    {:expression visit-expression-stmt
+                    {:block visit-block-stmt
+                     :expression visit-expression-stmt
                      :print visit-print-stmt
                      :var visit-var-stmt}
                     self))
+          (execute-block [self stmts environment]
+            (try
+              (let [self (assoc self :environment environment)]
+                (letfn [(loop [self stmts]
+                          (if (empty? stmts)
+                            (list self nil)
+                            (let [[self _] (execute self (first stmts))]
+                              (recur self (rest stmts)))))]
+                  (loop self stmts)))
+              (catch Exception _
+                (list self nil))))
+          (visit-block-stmt [self stmt]
+            (execute-block self (:statements stmt) (->Environment (:environment self))))
           (visit-expression-stmt [self stmt]
             (evaluate self (:expression stmt)))
           (visit-print-stmt [self stmt]

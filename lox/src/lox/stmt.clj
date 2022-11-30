@@ -1,5 +1,9 @@
 (ns lox.stmt)
 
+(defn ->BlockStmt [statements]
+  {:type :block
+   :value {:statements statements}})
+
 (defn ->ExpressionStmt [expression]
   {:type :expression
    :value {:expression expression}})
