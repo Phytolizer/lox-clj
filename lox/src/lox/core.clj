@@ -1,6 +1,7 @@
 (ns lox.core
   (:gen-class)
-  (:require [lox.helpers :refer [member]]
+  (:require lox.ast-printer
+            [lox.parser :refer [->Parser parse]]
             [lox.scanner :refer [->Scanner scan-tokens]]))
 
 (def new-state
@@ -8,8 +9,10 @@
 
 (defn run [source state]
   (let [scanner (->Scanner source)
-        [tokens state] (scan-tokens scanner state)]
-    (dorun (map (comp println (member .toString)) tokens))
+        [tokens state] (scan-tokens scanner state)
+        [_ state expr] (parse (->Parser tokens) state)]
+    (when (not (:had-error state))
+      (println (lox.ast-printer/print expr)))
     state))
 
 (defn run-prompt []
