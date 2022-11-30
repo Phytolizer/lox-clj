@@ -18,3 +18,7 @@
   {:type :unary
    :value {:operator operator
            :right right}})
+
+(defn ->VariableExpr [name]
+  {:type :variable
+   :value {:name name}})

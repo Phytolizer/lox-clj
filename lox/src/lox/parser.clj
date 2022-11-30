@@ -2,9 +2,9 @@
   (:refer-clojure :exclude (peek))
   (:require [lox.errors]
             [lox.expr :refer [->BinaryExpr ->GroupingExpr ->LiteralExpr
-                              ->UnaryExpr]]
+                              ->UnaryExpr ->VariableExpr]]
             [lox.helpers :refer [try-any]]
-            [lox.stmt :refer [->ExpressionStmt ->PrintStmt]]))
+            [lox.stmt :refer [->ExpressionStmt ->PrintStmt ->VarStmt]]))
 
 (defn ->Parser [tokens]
   {:tokens tokens
@@ -84,6 +84,7 @@
                        ['(:false) #(list %1 %2 (->LiteralExpr false))]
                        ['(:true) #(list %1 %2 (->LiteralExpr true))]
                        ['(:nil) #(list %1 %2 (->LiteralExpr nil))]
+                       ['(:identifier) #(list %1 %2 (->VariableExpr (previous %1)))]
                        ['(:number :string) #(list %1 %2 (->LiteralExpr (.literal (previous %1))))]
                        ['(:left-paren) (fn [parser state]
                                          (let [[parser state expr] (expression parser state)]
@@ -126,10 +127,25 @@
           (statement [parser state]
             (try-match parser state
                        ['(:print) #(print-statement %1 %2)]
-                       ['() #(expression-statement %1 %2)]))]
+                       ['() #(expression-statement %1 %2)]))
+          (var-declaration [parser state]
+            (let [parser (consume parser state :identifier "Expect variable name.")
+                  name (previous parser)
+                  [parser state initializer] (try-match parser state
+                                                        ['(:equal) #(expression %1 %2)]
+                                                        ['() #(list %1 %2 nil)])
+                  parser (consume parser state :semicolon "Expect ';' after variable declaration.")]
+              (list parser state (->VarStmt name initializer))))
+          (declaration [parser state]
+            (try
+              (try-match parser state
+                         ['(:var) #(var-declaration %1 %2)]
+                         ['() #(statement %1 %2)])
+              (catch clojure.lang.ExceptionInfo _
+                (list (synchronize parser) state nil))))]
     (letfn [(stmt-loop [parser state statements]
               (if (is-at-end parser)
                 (list parser state statements)
-                (let [[parser state s] (statement parser state)]
+                (let [[parser state s] (declaration parser state)]
                   (recur parser state (conj statements s)))))]
       (stmt-loop parser state []))))

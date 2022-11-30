@@ -1,5 +1,6 @@
 (ns lox.interpreter
-  (:require lox.errors
+  (:require [lox.environment :refer [->Environment]]
+            lox.errors
             [lox.helpers :refer [accept]]))
 
 (defn- truthy? [value]
@@ -25,12 +26,14 @@
                     {:binary visit-binary-expr
                      :grouping visit-grouping-expr
                      :literal visit-literal-expr
-                     :unary visit-unary-expr}
+                     :unary visit-unary-expr
+                     :variable visit-variable-expr}
                     self))
           (execute [self stmt]
             (accept stmt
                     {:expression visit-expression-stmt
-                     :print visit-print-stmt}
+                     :print visit-print-stmt
+                     :var visit-var-stmt}
                     self))
           (visit-expression-stmt [self stmt]
             (evaluate self (:expression stmt)))
@@ -38,6 +41,12 @@
             (let [[self value] (evaluate self (:expression stmt))]
               (println value)
               (list self nil)))
+          (visit-var-stmt [self stmt]
+            (let [[self value] (if (:initializer stmt)
+                                 (evaluate self (:initializer stmt))
+                                 (list self nil))
+                  environment (lox.environment/define (:environment self) (.lexeme (:name stmt)) value)]
+              (list (assoc self :environment environment) nil)))
           (visit-literal-expr [self expr]
             (list self (:value expr)))
           (visit-grouping-expr [self expr]
@@ -47,6 +56,9 @@
                   value (case (.type (:operator expr))
                           :minus (- (check-number-operand (:operator expr) right))
                           :bang (not (truthy? right)))]
+              (list self value)))
+          (visit-variable-expr [self expr]
+            (let [value (lox.environment/get (:environment self) (:name expr))]
               (list self value)))
           (visit-binary-expr [self expr]
             (let [[self left] (evaluate self (:left expr))
@@ -84,9 +96,9 @@
                 self
                 (let [[self _] (execute self (first stmts))]
                   (recur self (rest stmts)))))]
-      (run interpreter stmts))
+      (list (run interpreter stmts) state))
     (catch clojure.lang.ExceptionInfo e
       (list interpreter (lox.errors/runtime-error e state)))))
 
 (defn ->Interpreter []
-  nil)
+  {:environment (->Environment)})
