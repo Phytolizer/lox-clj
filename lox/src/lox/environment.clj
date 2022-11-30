@@ -22,7 +22,7 @@
   (let [entry (find (:values env) (.lexeme name))]
     (cond
       entry (assoc-in env [:values (.lexeme name)] value)
-      (:enclosing env) (assign (:enclosing env) name value)
+      (:enclosing env) (assoc env :enclosing (assign (:enclosing env) name value))
       :else (throw (ex-info "runtime error"
                             {:token name
                              :message (str "Undefined variable '" (.lexeme name) "'.")})))))

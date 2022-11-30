@@ -1,6 +1,7 @@
 (ns lox.parser
   (:refer-clojure :exclude (peek))
-  (:require [lox.errors]
+  (:require clojure.pprint
+            [lox.errors]
             [lox.expr :refer [->AssignExpr ->BinaryExpr ->GroupingExpr
                               ->LiteralExpr ->LogicalExpr ->UnaryExpr ->VariableExpr]]
             [lox.helpers :refer [try-any]]
@@ -176,8 +177,41 @@
                   parser (consume parser state :right-paren "Expect ')' after while condition.")
                   [parser state body] (statement parser state)]
               (list parser state (->WhileStmt condition body))))
+          (for-statement [parser state]
+            (let [parser (consume parser state :left-paren "Expect '(' after 'for'.")
+                  [parser state initializer] (try-match parser state
+                                                        ['(:semicolon) #(list %1 %2 nil)]
+                                                        ['(:var) (fn [parser state]
+                                                                   (let [[parser state var-decl] (var-declaration parser state)]
+                                                                     (list parser state var-decl)))]
+                                                        ['() (fn [parser state]
+                                                               (let [[parser state expr] (expression-statement parser state)]
+                                                                 (list parser state expr)))])
+                  [parser state condition] (let [[parser state expr] (if (check parser :semicolon)
+                                                                       (list parser state nil)
+                                                                       (expression parser state))
+                                                 parser (consume parser state :semicolon "Expect ';' after loop condition.")]
+                                             (list parser state expr))
+                  [parser state increment] (let [[parser state expr] (if (check parser :right-paren)
+                                                                       (list parser state nil)
+                                                                       (expression parser state))
+                                                 parser (consume parser state :right-paren "Expect ')' after for clauses.")]
+                                             (list parser state expr))
+                  [parser state body] (statement parser state)
+                  body (if increment
+                         (->BlockStmt [body (->ExpressionStmt increment)])
+                         body)
+                  body (->WhileStmt
+                        (or condition (->LiteralExpr true))
+                        body)
+                  body (if initializer
+                         (->BlockStmt [initializer body])
+                         body)]
+              (clojure.pprint/pprint body)
+              (list parser state body)))
           (statement [parser state]
             (try-match parser state
+                       ['(:for) #(for-statement %1 %2)]
                        ['(:if) #(if-statement %1 %2)]
                        ['(:print) #(print-statement %1 %2)]
                        ['(:while) #(while-statement %1 %2)]
