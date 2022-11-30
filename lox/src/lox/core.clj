@@ -5,7 +5,8 @@
   (println "lox> "))
 
 (defn run-file [file]
-  (println "Running file:" file))
+  (let [source (slurp file)]
+    (println source)))
 
 (defn -main
   "I don't do a whole lot ... yet."
