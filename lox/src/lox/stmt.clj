@@ -22,3 +22,8 @@
   {:type :var
    :value {:name name
            :initializer initializer}})
+
+(defn ->WhileStmt [condition body]
+  {:type :while
+   :value {:condition condition
+           :body body}})

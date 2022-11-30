@@ -5,7 +5,7 @@
                               ->LiteralExpr ->LogicalExpr ->UnaryExpr ->VariableExpr]]
             [lox.helpers :refer [try-any]]
             [lox.stmt :refer [->BlockStmt ->ExpressionStmt ->IfStmt
-                              ->PrintStmt ->VarStmt]]))
+                              ->PrintStmt ->VarStmt ->WhileStmt]]))
 
 (defn ->Parser [tokens]
   {:tokens tokens
@@ -170,10 +170,17 @@
                                                  (statement parser state)
                                                  (list parser state nil)))]
               (list parser state (->IfStmt condition then-branch else-branch))))
+          (while-statement [parser state]
+            (let [parser (consume parser state :left-paren "Expect '(' after 'while'.")
+                  [parser state condition] (expression parser state)
+                  parser (consume parser state :right-paren "Expect ')' after while condition.")
+                  [parser state body] (statement parser state)]
+              (list parser state (->WhileStmt condition body))))
           (statement [parser state]
             (try-match parser state
                        ['(:if) #(if-statement %1 %2)]
                        ['(:print) #(print-statement %1 %2)]
+                       ['(:while) #(while-statement %1 %2)]
                        ['(:left-brace) #(block-statement %1 %2)]
                        ['() #(expression-statement %1 %2)]))
           (var-declaration [parser state]

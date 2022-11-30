@@ -37,7 +37,8 @@
                      :expression visit-expression-stmt
                      :if visit-if-stmt
                      :print visit-print-stmt
-                     :var visit-var-stmt}
+                     :var visit-var-stmt
+                     :while visit-while-stmt}
                     self))
           (execute-block [self stmts environment]
             (let [self (assoc self :environment environment)]
@@ -69,6 +70,14 @@
                                 (.lexeme (:name stmt))
                                 value)]
               (list (assoc self :environment environment) nil)))
+          (visit-while-stmt [self stmt]
+            (letfn [(loop [self]
+                      (let [[self condition] (evaluate self (:condition stmt))]
+                        (if (truthy? condition)
+                          (let [[self _] (execute self (:body stmt))]
+                            (recur self))
+                          (list self nil))))]
+              (loop self)))
           (visit-assign-expr [self expr]
             (let [[self value] (evaluate self (:value expr))
                   environment  (lox.environment/assign (:environment self)
