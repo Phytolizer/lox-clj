@@ -1,7 +1,6 @@
 (ns lox.parser
   (:refer-clojure :exclude (peek))
-  (:require clojure.pprint
-            [lox.errors]
+  (:require [lox.errors]
             [lox.expr :refer [->AssignExpr ->BinaryExpr ->GroupingExpr
                               ->LiteralExpr ->LogicalExpr ->UnaryExpr ->VariableExpr]]
             [lox.helpers :refer [try-any]]
@@ -207,7 +206,6 @@
                   body (if initializer
                          (->BlockStmt [initializer body])
                          body)]
-              (clojure.pprint/pprint body)
               (list parser state body)))
           (statement [parser state]
             (try-match parser state
