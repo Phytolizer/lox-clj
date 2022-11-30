@@ -92,7 +92,7 @@
             (let [[parser matched] (match parser '(:bang :minus))]
               (if matched
                 (let [operator (previous parser)
-                      right (unary parser state)
+                      [parser state right] (unary parser state)
                       expr (->UnaryExpr operator right)]
                   (list parser state expr))
                 (primary parser state))))

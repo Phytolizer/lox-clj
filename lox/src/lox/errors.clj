@@ -12,3 +12,10 @@
   (case (.type token)
     :eof (report (.line token) " at end" message state)
     (report (.line token) (str " at '" (.lexeme token) "'") message state)))
+
+(defn runtime-error [error state]
+  (let [{:keys [token message]} (ex-data error)]
+    (binding [*out* *err*]
+      (println message)
+      (println (str "[line " (.line token) "]")))
+    (assoc state :had-runtime-error true)))
