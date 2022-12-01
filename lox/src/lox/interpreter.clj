@@ -28,6 +28,7 @@
                       (if (.endsWith text ".0")
                         (subs text 0 (- (count text) 2))
                         text))
+    (:to-string value) ((:to-string value) value)
     :else (.toString value)))
 
 (def ^:private execute
