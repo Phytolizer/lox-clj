@@ -1,8 +1,9 @@
 (ns lox.parser
   (:refer-clojure :exclude (peek))
   (:require [lox.errors]
-            [lox.expr :refer [->AssignExpr ->BinaryExpr ->GroupingExpr
-                              ->LiteralExpr ->LogicalExpr ->UnaryExpr ->VariableExpr]]
+            [lox.expr :refer [->AssignExpr ->BinaryExpr ->CallExpr
+                              ->GroupingExpr ->LiteralExpr ->LogicalExpr ->UnaryExpr
+                              ->VariableExpr]]
             [lox.helpers :refer [try-any]]
             [lox.stmt :refer [->BlockStmt ->ExpressionStmt ->IfStmt
                               ->PrintStmt ->VarStmt ->WhileStmt]]))
@@ -45,7 +46,7 @@
 
 (defn- error
   ([parser state message] (error parser state (peek parser) message))
-  ([_ state token message]
+  ([_parser state token message]
    (let [state (lox.errors/error-token token message state)]
      (ex-info "parser error" {:state state}))))
 
@@ -81,6 +82,8 @@
           (result-if-match parser state)
           (recur parser state (rest pairs)))))))
 
+
+
 (defn parse [parser state]
   (letfn [(primary [parser state]
             (try-match parser state
@@ -94,13 +97,40 @@
                                            (consume parser state :right-paren "Expect ')' after expression.")
                                            (list parser state (->GroupingExpr expr))))]
                        ['() #(throw (error %1 %2 "Expect expression."))]))
+          (finish-call [parser state callee]
+            (letfn [(parse-args [parser state args]
+                      (when (>= (count args) 255)
+                        (error parser state (peek parser) "Cannot have more than 255 arguments."))
+                      (let [[parser state expr] (expression parser state)
+                            args (conj args expr)
+                            [parser matched] (match parser '(:comma))]
+                        (if matched
+                          (recur parser state args)
+                          (list parser state args))))]
+              (let [args []
+                    [parser state args] (if (check parser :right-paren)
+                                          (list parser state args)
+                                          (parse-args parser state args))
+                    parser (consume parser state :right-paren "Expect ')' after arguments.")]
+                (list parser
+                      state
+                      (->CallExpr callee (previous parser) args)))))
+          (call [parser state]
+            (let [[parser state expr] (primary parser state)]
+              (letfn [(loop [parser state expr]
+                        (let [[parser matched] (match parser '(:left-paren))]
+                          (if matched
+                            (let [[parser state expr] (finish-call parser state expr)]
+                              (recur parser state expr))
+                            (list parser state expr))))]
+                (loop parser state expr))))
           (unary [parser state]
             (try-match parser state
                        ['(:bang :minus) (fn [parser state]
                                           (let [operator (previous parser)
                                                 [parser state right] (unary parser state)]
                                             (list parser state (->UnaryExpr operator right))))]
-                       ['() #(primary %1 %2)]))
+                       ['() #(call %1 %2)]))
           (factor [parser state]
             (binary-parser-loop unary
                                 '(:slash :star)

@@ -1,5 +1,6 @@
 (ns lox.interpreter
-  (:require [lox.environment :refer [->Environment]]
+  (:require [lox.callable :refer [->Callable]]
+            [lox.environment :refer [->Environment]]
             lox.errors
             [lox.helpers :refer [accept]]))
 
@@ -34,6 +35,7 @@
             (accept expr
                     {:assign visit-assign-expr
                      :binary visit-binary-expr
+                     :call visit-call-expr
                      :grouping visit-grouping-expr
                      :literal visit-literal-expr
                      :logical visit-logical-expr
@@ -93,6 +95,22 @@
                                                        (:name expr)
                                                        value)]
               (list (assoc self :environment environment) value)))
+          (visit-call-expr [self expr]
+            (let [[self callee] (evaluate self (:callee expr))
+                  collect-args (fn [self args out]
+                                 (if (empty? args)
+                                   (list self out)
+                                   (let [[self value] (evaluate self (first args))]
+                                     (recur self (rest args) (conj out value)))))
+                  [self args] (collect-args self (:arguments expr) [])]
+              (cond
+                (nil? (:callable callee)) (throw (runtime-error
+                                                  (:paren expr)
+                                                  "Can only call functions and classes."))
+                (not= (count args) (:arity callee)) (throw (runtime-error
+                                                            (:paren expr)
+                                                            (str "Expected " (:arity callee) " arguments but got " (count args) ".")))
+                :else ((:call callee) self args))))
           (visit-literal-expr [self expr]
             (list self (:value expr)))
           (visit-grouping-expr [self expr]
@@ -143,5 +161,13 @@
     (catch clojure.lang.ExceptionInfo e
       (list interpreter (lox.errors/runtime-error e state)))))
 
+(def ^:private globals
+  (-> (->Environment)
+      (lox.environment/define "clock"
+        (->Callable
+         0
+         (fn [interpreter _args]
+           (list interpreter (/ (System/currentTimeMillis) 1000.0)))))))
+
 (defn ->Interpreter []
-  {:environment (->Environment)})
+  {:environment globals})

@@ -11,6 +11,12 @@
            :operator operator
            :right right}})
 
+(defn ->CallExpr [callee paren arguments]
+  {:type :call
+   :value {:callee callee
+           :paren paren
+           :arguments arguments}})
+
 (defn ->GroupingExpr [expression]
   {:type :grouping
    :value {:expression expression}})
